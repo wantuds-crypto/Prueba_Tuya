@@ -1,0 +1,51 @@
+DECLARE @fecha_base DATE = '2026-03-01';
+DECLARE @n_min_racha INT = 3;
+
+WITH 
+-- 1. Datos filtrados
+datos_filtrados AS (
+  SELECT h.identificacion, h.corte_mes, h.saldo
+  FROM historia h
+  LEFT JOIN retiros r ON h.identificacion = r.identificacion
+  WHERE h.corte_mes <= @fecha_base
+    AND (r.fecha_retiro IS NULL OR h.corte_mes <= r.fecha_retiro)
+),
+
+-- 2. Niveles
+niveles AS (
+  SELECT identificacion, corte_mes,
+    CASE 
+      WHEN saldo < 300000 THEN 'N0'
+      WHEN saldo < 1000000 THEN 'N1'
+      WHEN saldo < 3000000 THEN 'N2'
+      WHEN saldo < 5000000 THEN 'N3'
+      ELSE 'N4'
+    END AS nivel
+  FROM datos_filtrados
+),
+
+-- 3. Contar rachas consecutivas por cliente/nivel
+rachas_por_nivel AS (
+  SELECT 
+    identificacion,
+    nivel,
+    COUNT(*) AS racha,
+    MAX(corte_mes) AS fecha_fin,
+    ROW_NUMBER() OVER (
+      PARTITION BY identificacion 
+      ORDER BY COUNT(*) DESC, MAX(corte_mes) DESC
+    ) AS rn_nivel
+  FROM niveles
+  GROUP BY identificacion, nivel
+  HAVING COUNT(*) >= @n_min_racha
+)
+
+-- RESULTADO FINAL
+SELECT 
+  identificacion,
+  racha AS meses_consecutivos,
+  fecha_fin,
+  nivel
+FROM rachas_por_nivel
+WHERE rn_nivel = 1
+ORDER BY identificacion;

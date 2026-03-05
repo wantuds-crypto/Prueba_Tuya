@@ -40,7 +40,7 @@ rachas_por_nivel AS (
   HAVING COUNT(*) >= @n_min_racha
 )
 
--- RESULTADO FINAL
+-- Resultado Final
 SELECT 
   identificacion,
   racha AS meses_consecutivos,
